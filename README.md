@@ -13,36 +13,37 @@ This solution is based on "kind" (by eliminating the dependency on kind CLI/Go),
 
 `docker pull guyrotem/kubernetes:latest`
 
+```
+NODE_NAME=k8s-control-plane
+KUBE_CONFIG_PATH=~/.kube/containerized-k8s
+CONTAINERIZED_K8S_PORT=32768
+DOCKER_CLIENT_IP=127.0.0.1 #Mac
+API_SERVER_PORT=6443
+```
 
-`NODE_NAME=k8s-control-plane`
+//  start the container
 
-`KUBE_CONFIG_PATH=~/.kube/containerized-k8s`
-
-`CONTAINERIZED_K8S_PORT=32768`
-
-`DOCKER_CLIENT_IP=127.0.0.1` #Mac
-
-`API_SERVER_PORT=6443`
-
-
-`docker run --name=$NODE_NAME --hostname=$NODE_NAME --privileged --security-opt seccomp=unconfined --security-opt apparmor=unconfined --tmpfs /tmp --tmpfs /run -p $DOCKER_CLIENT_IP:$CONTAINERIZED_K8S_PORT:$API_SERVER_PORT --tty --label io.x-k8s.kind.role="control-plane" --label io.x-k8s.kind.cluster="k8s" --detach=true -t guyrotem/kubernetes`
+`docker run --name=$NODE_NAME --hostname=$NODE_NAME --privileged --tmpfs /tmp --tmpfs /run -p $DOCKER_CLIENT_IP:$CONTAINERIZED_K8S_PORT:$API_SERVER_PORT --tty --label io.x-k8s.kind.role="control-plane" --label io.x-k8s.kind.cluster="k8s" --detach=true -t guyrotem/kubernetes`
 
 `CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $NODE_NAME)`
 
-`docker exec -it k8s-control-plane bootstrap-k8s.sh`
+//  use kubeadm to bootstrap cluster
 
-`docker exec -it k8s-control-plane post-init.sh`
+`docker exec -it $NODE_NAME bootstrap-k8s.sh`
+
+`docker exec -it $NODE_NAME post-init.sh`
 
 
 // retrieve admin credentials
 
-`docker exec -it k8s-control-plane cat /etc/kubernetes/admin.conf | sed "s|$CONTAINER_IP:6443|127.0.0.1:$CONTAINERIZED_K8S_PORT|g" > $KUBE_CONFIG_PATH`
+`docker exec -it $NODE_NAME cat /etc/kubernetes/admin.conf | sed "s|$CONTAINER_IP:$API_SERVER_PORT|$DOCKER_CLIENT_IP:$CONTAINERIZED_K8S_PORT|g" > $KUBE_CONFIG_PATH`
 
 // verify
 
 // create busybox
 
-`cat <<EOF | kubectl --kubeconfig $KUBE_CONFIG_PATH create -f -                        
+```
+cat <<EOF | kubectl --kubeconfig $KUBE_CONFIG_PATH create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -57,7 +58,8 @@ spec:
         - "1800"
       imagePullPolicy: IfNotPresent
       name: busybox
-EOF`
+EOF
+```
 
 // make sure pod is running
 
